@@ -1,7 +1,6 @@
-"""A tiny sample plugin used by tests and as a reference implementation.
+"""Updated sample plugin that stores the registry reference during start and uses it during stop.
 
-This plugin subscribes to all events and logs them. It demonstrates the plugin
-start/stop lifecycle.
+This fixes the earlier bug where `registry` was referenced but not stored on the instance.
 """
 from __future__ import annotations
 
@@ -17,9 +16,11 @@ class SamplePlugin:
         self._logger = get_logger(__name__)
         self._registered = False
         self._handler = None
+        self._registry: Any | None = None
 
     async def start(self, registry: Any) -> None:
         self._logger.info("SamplePlugin starting")
+        self._registry = registry
         try:
             event_bus = await registry.resolve("event_bus")
         except KeyError:
@@ -30,18 +31,23 @@ class SamplePlugin:
             self._logger.info("SamplePlugin received event", event=evt.name, payload=evt.payload)
 
         self._handler = _on_event
-        event_bus.subscribe(Event, self._handler)
+        # subscribe with low priority and as background so it doesn't block
+        await event_bus.subscribe(Event, self._handler, priority=-10, background=True)
         self._registered = True
 
     async def stop(self) -> None:
         self._logger.info("SamplePlugin stopping")
-        if self._registered and self._handler:
+        if self._registered and self._handler and self._registry is not None:
             # Unsubscribe if possible
             try:
-                event_bus = await registry.resolve("event_bus")
-                event_bus.unsubscribe(Event, self._handler)
+                event_bus = await self._registry.resolve("event_bus")
+                await event_bus.unsubscribe(Event, self._handler)
             except Exception:
                 # registry not available at shutdown
-                pass
+                self._logger.exception("Failed to unsubscribe during stop")
         # short delay to simulate cleanup
         await asyncio.sleep(0.01)
+
+
+def SamplePluginFactory() -> SamplePlugin:  # pragma: no cover - convenience factory
+    return SamplePlugin()

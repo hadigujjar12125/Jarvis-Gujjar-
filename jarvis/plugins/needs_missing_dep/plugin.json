@@ -1,0 +1,1 @@
+{"id": "needs_missing_dep", "name": "Needs Missing Dep", "version": "0.1.0", "entry_point": "jarvis.plugins.sample_plugin.plugin:SamplePluginFactory", "requires": [{"id": "nonexistent_plugin", "min_version": "1.0.0"}]}

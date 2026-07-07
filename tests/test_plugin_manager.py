@@ -1,4 +1,4 @@
-"""Tests for PluginManager discover/start/stop lifecycle using the sample plugin."""
+"""Updated plugin manager tests to assert that disabled plugins and plugins with unmet dependencies are not loaded."""
 from __future__ import annotations
 
 import asyncio
@@ -21,6 +21,11 @@ async def test_plugin_manager_start_stop() -> None:
 
     # Start all should not raise
     await pm.start_all(sr)
+
+    # The disabled plugin should not be loaded
+    assert "disabled_plugin" not in pm._loaded
+    # The plugin with missing dependency should not be loaded
+    assert "needs_missing_dep" not in pm._loaded
 
     # Stop all should not raise
     await pm.stop_all()

@@ -1,0 +1,1 @@
+{"id": "disabled_plugin", "name": "Disabled Plugin", "version": "0.0.1", "entry_point": "jarvis.plugins.sample_plugin.plugin:SamplePluginFactory", "enabled": false}
