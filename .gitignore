@@ -1,0 +1,25 @@
+# Git ignore
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.env
+.env.*
+.venv/
+venv/
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+jarvis/logs/
+
+# OS files
+.DS_Store
+Thumbs.db
