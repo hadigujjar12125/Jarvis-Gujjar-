@@ -1,23 +1,17 @@
-"""Core typed interfaces (ports) for JARVIS modules.
+"""Core ports (protocols) used by the system.
 
-Use typing.Protocol to define the contracts implemented by plugins and adapters.
-These lightweight protocols make testing and swapping implementations straightforward.
+This module defines the contracts implemented by adapters and providers. The
+IAIProvider interface returns streaming `AIChunk` objects for rich token-level
+semantics.
 """
 from __future__ import annotations
 
 from typing import AsyncIterator, Protocol, Sequence, Any, Dict
 
-from jarvis.core.infrastructure.event_bus import Event
+from jarvis.core.ai_types import AIChunk
 
 
 class IPlugin(Protocol):
-    """Plugin contract required by the PluginManager.
-
-    Plugins should implement an async start(registry) method and an async stop() method.
-    They may optionally expose a metadata() method returning a dict or object describing
-    the plugin.
-    """
-
     async def start(self, registry: Any) -> None:  # pragma: no cover - interface
         ...
 
@@ -29,10 +23,10 @@ class IAIProvider(Protocol):
     """AI provider abstraction.
 
     Implementations should support streaming chat responses as an async iterator
-    and a simple non-streaming chat method.
+    yielding AIChunk objects and a simple non-streaming chat method.
     """
 
-    async def stream_chat(self, prompt: str, context: Sequence[str] | None = None) -> AsyncIterator[str]:
+    async def stream_chat(self, prompt: str, context: Sequence[str] | None = None) -> AsyncIterator[AIChunk]:
         ...
 
     async def chat(self, prompt: str, context: Sequence[str] | None = None) -> str:
@@ -61,6 +55,9 @@ class IMemoryStore(Protocol):
         ...
 
     async def get(self, key: str) -> Any:
+        ...
+
+    async def delete(self, key: str) -> None:
         ...
 
 
