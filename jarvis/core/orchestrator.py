@@ -1,12 +1,13 @@
-"""Main orchestrator that wires core services and manages lifecycle.
+"""Orchestrator wiring: register EventBus, Settings, MemoryStore, and AI provider registry.
 
-The orchestrator builds the EventBus and ServiceRegistry, registers core services,
-loads plugins, and provides a simple run loop with graceful shutdown.
+This updates the startup sequence to initialize and register the memory system so plugins
+can resolve it during their start(). The orchestrator also ensures the autosave task is
+started and stopped as part of the lifecycle.
 """
 from __future__ import annotations
 
 import asyncio
-import logging
+from pathlib import Path
 from typing import Optional
 
 from jarvis.core.infrastructure.event_bus import EventBus
@@ -14,6 +15,8 @@ from jarvis.core.infrastructure.plugin_manager import PluginManager
 from jarvis.core.infrastructure.service_registry import ServiceRegistry
 from jarvis.utils.logger import get_logger
 from config.settings import load_settings
+from jarvis.memory import create_default_json_store
+from jarvis.ai.registry import ProviderRegistry
 
 
 class JarvisOrchestrator:
@@ -27,6 +30,8 @@ class JarvisOrchestrator:
         self.registry = ServiceRegistry()
         self.plugin_manager = PluginManager()
         self._stopped = asyncio.Event()
+        self._memory_store = None
+        self._ai_registry = None
 
     async def start(self) -> None:
         """Start core services and plugins."""
@@ -35,6 +40,24 @@ class JarvisOrchestrator:
         # Register core services in the registry
         await self.registry.register("event_bus", self.event_bus)
         await self.registry.register("settings", self.settings)
+
+        # Initialize and register memory store so plugins can resolve it during start
+        repo_root = Path(__file__).resolve().parents[2]
+        data_dir = repo_root / "jarvis" / "data"
+        memory_store = create_default_json_store(data_dir)
+        # Pass event_bus to memory so it can emit events
+        try:
+            await memory_store.load()
+            await memory_store.start_autosave()
+        except Exception:
+            self._logger.exception("Failed to initialize memory store")
+
+        await self.registry.register("memory", memory_store)
+        self._memory_store = memory_store
+
+        # Initialize AI provider registry and register it
+        self._ai_registry = ProviderRegistry()
+        await self.registry.register("ai_registry", self._ai_registry)
 
         # Start plugins
         try:
@@ -54,6 +77,14 @@ class JarvisOrchestrator:
             await self.plugin_manager.stop_all()
         except Exception:
             self._logger.exception("Error while stopping plugins")
+
+        # Stop memory autosave and persist memory
+        if self._memory_store is not None:
+            try:
+                await self._memory_store.stop_autosave()
+                await self._memory_store.save()
+            except Exception:
+                self._logger.exception("Error while stopping memory store")
 
         self._stopped.set()
         self._logger.info("Jarvis stopped")
